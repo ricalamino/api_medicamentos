@@ -22,6 +22,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Ensure UTF-8 encoding for JSON responses
+@app.middleware("http")
+async def ensure_utf8_middleware(request, call_next):
+    response = await call_next(request)
+    if response.headers.get("content-type", "").startswith("application/json"):
+        response.headers["content-type"] = "application/json; charset=utf-8"
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

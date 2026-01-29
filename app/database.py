@@ -19,7 +19,13 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-engine = create_engine(settings.database_url)
+# Ensure UTF-8 encoding in connection
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    connect_args={"client_encoding": "utf8"} if 'postgresql' in settings.database_url else {},
+    echo=False
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
