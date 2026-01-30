@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"  # allow extra env vars (e.g. DISABLE_SSL_VERIFY) without validation error
 
 
 settings = Settings()
