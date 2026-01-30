@@ -1,8 +1,11 @@
 import csv
-import sys
 import os
+import ssl
+import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
+from urllib.request import urlopen, Request
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -10,6 +13,37 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlalchemy.orm import Session
 from app.database import SessionLocal, init_db
 from app.models import Medicamento
+
+# Default source: ANVISA open data (import by URL, not local file)
+DEFAULT_CSV_URL = "https://dados.anvisa.gov.br/dados/DADOS_ABERTOS_MEDICAMENTOS.csv"
+
+
+def _download_url(url: str, dest_path: str) -> None:
+    """Download URL to file. Uses certifi CA bundle; if SSL fails and DISABLE_SSL_VERIFY=1, retries without verification."""
+    from urllib.error import URLError
+    req = Request(url, headers={"User-Agent": "MedicamentosAPI/1.0"})
+
+    def _do_download(ctx: ssl.SSLContext) -> None:
+        with urlopen(req, context=ctx, timeout=300) as resp:
+            with open(dest_path, "wb") as f:
+                f.write(resp.read())
+
+    # Prefer certifi CA bundle
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        _do_download(ctx)
+        return
+    except (URLError, OSError) as e:
+        if "CERTIFICATE_VERIFY_FAILED" not in str(e) and "certificate verify failed" not in str(e).lower():
+            raise
+        if os.environ.get("DISABLE_SSL_VERIFY", "").strip().lower() in ("1", "true", "yes"):
+            print("Warning: SSL verification disabled (DISABLE_SSL_VERIFY). Use only in trusted environments.")
+            ctx = ssl._create_unverified_context()
+            _do_download(ctx)
+            return
+        print("Hint: set DISABLE_SSL_VERIFY=1 to allow download without SSL verification (WSL/Docker/minimal env).")
+        raise
 
 
 def parse_date(date_str):
@@ -33,20 +67,34 @@ def clean_string(value):
 
 
 def import_csv(csv_path: str, batch_size: int = 1000):
-    """Import CSV file to database"""
+    """Import CSV from file path or URL into database."""
     db: Session = SessionLocal()
-    
+    temp_file = None
+
     try:
-        # Initialize database
         print("Initializing database...")
         init_db()
-        
-        # Check if file exists
-        if not os.path.exists(csv_path):
-            print(f"Error: File {csv_path} not found")
+
+        # Resolve source: URL -> download to temp file; env CSV_URL overrides default path
+        if csv_path.strip().startswith(("http://", "https://")):
+            url = csv_path.strip()
+            print(f"Downloading CSV from {url}...")
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+            temp_file.close()
+            _download_url(url, temp_file.name)
+            csv_path = temp_file.name
+        elif os.environ.get("CSV_URL"):
+            url = os.environ.get("CSV_URL")
+            print(f"Downloading CSV from CSV_URL: {url}...")
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+            temp_file.close()
+            _download_url(url, temp_file.name)
+            csv_path = temp_file.name
+        elif not os.path.exists(csv_path):
+            print(f"Error: File or URL not found: {csv_path}")
             return
-        
-        print(f"Reading CSV file: {csv_path}")
+
+        print(f"Reading CSV: {csv_path}")
         
         # Read CSV with different encodings (ISO-8859-1 detected by chardet, try it first)
         encodings = ['iso-8859-1', 'cp1252', 'latin-1', 'utf-8']
@@ -165,17 +213,16 @@ def import_csv(csv_path: str, batch_size: int = 1000):
         raise
     finally:
         db.close()
+        if temp_file and os.path.exists(temp_file.name):
+            try:
+                os.unlink(temp_file.name)
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":
-    # Default CSV path
-    csv_path = os.path.join(
-        Path(__file__).parent.parent,
-        "DADOS_ABERTOS_MEDICAMENTOS.csv"
-    )
-    
-    # Allow custom path as argument
+    # Default: ANVISA URL; override with env CSV_URL or first argument (path or URL)
+    csv_path = os.environ.get("CSV_URL") or DEFAULT_CSV_URL
     if len(sys.argv) > 1:
         csv_path = sys.argv[1]
-    
     import_csv(csv_path)
