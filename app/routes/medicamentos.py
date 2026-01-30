@@ -51,22 +51,6 @@ def list_medicamentos(
     )
 
 
-@router.get("/{medicamento_id}", response_model=MedicamentoResponse)
-def get_medicamento(
-    medicamento_id: int,
-    db: Session = Depends(get_db),
-    api_key: str = Depends(get_api_key)
-):
-    """Get medicamento by ID"""
-    medicamento = db.query(Medicamento).filter(Medicamento.id == medicamento_id).first()
-    if not medicamento:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Medicamento not found"
-        )
-    return medicamento
-
-
 @router.get("/search", response_model=MedicamentoListResponse)
 def search_medicamentos(
     q: str = Query(..., min_length=1, description="Search term"),
@@ -94,3 +78,19 @@ def search_medicamentos(
         limit=limit,
         pages=pages
     )
+
+
+@router.get("/{medicamento_id}", response_model=MedicamentoResponse)
+def get_medicamento(
+    medicamento_id: int,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_api_key)
+):
+    """Get medicamento by ID"""
+    medicamento = db.query(Medicamento).filter(Medicamento.id == medicamento_id).first()
+    if not medicamento:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Medicamento not found"
+        )
+    return medicamento

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -6,8 +6,36 @@ from app.database import get_db
 from app.models import APIKey
 from app.schemas import APIKeyCreate, APIKeyResponse, APIKeyCreateResponse
 from app.auth import get_api_key, generate_api_key, hash_key
+from app.ratelimit import check_rate_limit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/keys/public", response_model=APIKeyCreateResponse)
+def create_api_key_public(
+    key_data: APIKeyCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Create a new API key (public, no auth). Rate limited by IP (5/hour)."""
+    check_rate_limit(request)
+    new_key = generate_api_key()
+    hashed_key = hash_key(new_key)
+    db_key = APIKey(
+        key=hashed_key,
+        name=key_data.name,
+        is_active=True,
+    )
+    db.add(db_key)
+    db.commit()
+    db.refresh(db_key)
+    return APIKeyCreateResponse(
+        id=db_key.id,
+        key=new_key,
+        name=db_key.name,
+        is_active=db_key.is_active,
+        created_at=db_key.created_at,
+    )
 
 
 @router.post("/keys", response_model=APIKeyCreateResponse)

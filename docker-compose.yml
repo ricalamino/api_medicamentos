@@ -1,0 +1,23 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://medicamentos_user:medicamentos_pass@db:5432/medicamentos_db
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      API_PREFIX: /api/v1
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: medicamentos_user
+      POSTGRES_PASSWORD: medicamentos_pass
+      POSTGRES_DB: medicamentos_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

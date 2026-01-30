@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API de Medicamentos do Brasil — ANVISA</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --error: #f85149;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    p { color: var(--muted); margin: 0 0 1rem; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    section { margin: 2rem 0; }
+    .card {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1rem 0;
+    }
+    label { display: block; margin-bottom: 0.25rem; font-weight: 500; }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 1rem;
+    }
+    input:focus { outline: none; border-color: var(--accent); }
+    button {
+      margin-top: 0.75rem;
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .key-display {
+      word-break: break-all;
+      font-family: ui-monospace, monospace;
+      font-size: 0.9rem;
+      padding: 0.75rem;
+      background: var(--bg);
+      border-radius: 6px;
+      margin-top: 0.75rem;
+      border: 1px solid #30363d;
+    }
+    .message { margin-top: 0.75rem; }
+    .message.error { color: var(--error); }
+    .message.success { color: var(--success); }
+    .message.warn { color: #d29922; }
+  </style>
+</head>
+<body>
+  <h1>API de Medicamentos do Brasil</h1>
+  <p>Dados públicos de medicamentos registrados na ANVISA. Use a API para consultar medicamentos, princípios ativos e situação de registro.</p>
+  <p><a href="/docs">Documentação interativa (Swagger)</a> · <a href="/redoc">ReDoc</a></p>
+
+  <section>
+    <h2>Gerar sua API Key</h2>
+    <div class="card">
+      <form id="key-form">
+        <label for="name">Nome ou identificador (ex.: Meu App, Dashboard)</label>
+        <input type="text" id="name" name="name" required minlength="1" maxlength="200" placeholder="Ex.: Meu App">
+        <button type="submit" id="submit-btn">Gerar API Key</button>
+      </form>
+      <div id="message" class="message" role="alert" aria-live="polite"></div>
+      <div id="key-result" class="key-display" style="display: none;"></div>
+    </div>
+    <p style="font-size: 0.875rem; color: var(--muted);">Limite: 5 chaves por hora por IP. Guarde a chave em local seguro; ela não será exibida novamente.</p>
+  </section>
+
+  <section>
+    <h2>Como usar</h2>
+    <p>Inclua o header em todas as requisições:</p>
+    <pre class="card" style="margin: 0; overflow-x: auto;"><code>X-API-Key: sua-api-key-aqui</code></pre>
+    <p>Exemplo:</p>
+    <pre class="card" style="margin: 0; overflow-x: auto;"><code>curl -H "X-API-Key: SUA_KEY" https://api.seudominio.com/api/v1/medicamentos</code></pre>
+  </section>
+
+  <script>
+    const form = document.getElementById('key-form');
+    const nameInput = document.getElementById('name');
+    const submitBtn = document.getElementById('submit-btn');
+    const messageEl = document.getElementById('message');
+    const keyResultEl = document.getElementById('key-result');
+
+    function showMessage(text, type) {
+      messageEl.textContent = text;
+      messageEl.className = 'message ' + (type || '');
+      messageEl.style.display = 'block';
+    }
+
+    function showKey(key) {
+      keyResultEl.textContent = key;
+      keyResultEl.style.display = 'block';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = nameInput.value.trim();
+      if (!name) return;
+      submitBtn.disabled = true;
+      messageEl.style.display = 'none';
+      keyResultEl.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/v1/auth/keys/public', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          showMessage(data.detail || 'Erro ao gerar chave. Tente novamente.', 'error');
+          if (res.status === 429) showMessage('Muitas requisições. Tente novamente mais tarde.', 'error');
+          submitBtn.disabled = false;
+          return;
+        }
+
+        showMessage(data.message || 'Chave gerada. Copie e guarde em local seguro.', 'success');
+        showKey(data.key);
+        nameInput.value = '';
+      } catch (err) {
+        showMessage('Erro de rede. Verifique a conexão.', 'error');
+      }
+      submitBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>
