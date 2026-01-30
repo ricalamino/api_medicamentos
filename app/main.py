@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from app.database import init_db, settings
-from app.routes import medicamentos, auth, stats
+from app.routes import medicamentos, auth, stats, admin
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -46,6 +46,7 @@ app.add_middleware(
 app.include_router(medicamentos.router, prefix=settings.api_prefix)
 app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(stats.router, prefix=settings.api_prefix)
+app.include_router(admin.router, prefix=settings.api_prefix)
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

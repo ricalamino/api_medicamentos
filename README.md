@@ -87,6 +87,7 @@ X-API-Key: sua-api-key-aqui
 - `POST /api/v1/auth/keys/public` - **Criar API Key (público, rate limit 5/hora por IP)**
 - `POST /api/v1/auth/keys` - Criar nova API Key (exige API Key)
 - `GET /api/v1/auth/keys` - Listar API Keys (exige API Key)
+- `POST /api/v1/admin/import` - **Rodar import do CSV (reimportar/atualizar dados; exige API Key)**
 
 ## Deploy
 
